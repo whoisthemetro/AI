@@ -1,1 +1,569 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Art</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Cinzel+Decorative:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --gold: #c9a84c;
+      --gold-light: #e8d5a3;
+      --dark: #050505;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--dark);
+      color: var(--gold-light);
+      font-family: 'Cormorant Garamond', serif;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* Custom cursor */
+    .cursor {
+      width: 12px;
+      height: 12px;
+      background: var(--gold);
+      border-radius: 50%;
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.08s ease, width 0.2s, height 0.2s, background 0.2s;
+      mix-blend-mode: screen;
+    }
+    .cursor-trail {
+      width: 36px;
+      height: 36px;
+      border: 1px solid rgba(201,168,76,0.5);
+      border-radius: 50%;
+      position: fixed;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: left 0.1s ease-out, top 0.1s ease-out, width 0.3s, height 0.3s, border-color 0.3s;
+    }
+    .cursor.pulled {
+      width: 18px;
+      height: 18px;
+      background: #fff;
+    }
+    .cursor-trail.pulled {
+      border-color: rgba(255,255,255,0.6);
+      width: 50px;
+      height: 50px;
+    }
+
+    /* Pixel canvas overlay */
+    #pixelCanvas {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* Shatter particles */
+    .shard {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9990;
+      border-radius: 1px;
+      opacity: 1;
+    }
+
+    /* Hero parallax section */
+    .hero {
+      position: relative;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .parallax-bg {
+      position: absolute;
+      inset: -15%;
+      background-image: url('https://raw.githubusercontent.com/whoisthemetro/AI/main/Suzanne%20trapped%20in%20a%20cage_1920x1080.png');
+      background-size: cover;
+      background-position: center;
+      will-change: transform;
+      filter: brightness(0.55) contrast(1.1);
+    }
+
+    /* Vignette */
+    .hero::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 20%, rgba(5,5,5,0.7) 100%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .hero-eyebrow {
+      font-family: 'Cormorant Garamond', serif;
+      font-weight: 300;
+      font-style: italic;
+      letter-spacing: 0.4em;
+      font-size: clamp(0.65rem, 1.5vw, 0.85rem);
+      color: var(--gold);
+      text-transform: uppercase;
+      opacity: 0;
+      animation: fadeUp 1.2s 0.3s forwards;
+    }
+
+    .hero-title {
+      font-family: 'Cinzel Decorative', serif;
+      font-size: clamp(2.5rem, 8vw, 7rem);
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      background: linear-gradient(135deg, #c9a84c 0%, #f5e6b8 50%, #c9a84c 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin: 1.2rem 0 1.5rem;
+      opacity: 0;
+      animation: fadeUp 1.2s 0.6s forwards;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(0.9rem, 2vw, 1.15rem);
+      font-weight: 300;
+      font-style: italic;
+      color: rgba(232,213,163,0.7);
+      letter-spacing: 0.15em;
+      opacity: 0;
+      animation: fadeUp 1.2s 0.9s forwards;
+    }
+
+    .scroll-indicator {
+      position: absolute;
+      bottom: 2.5rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      opacity: 0;
+      animation: fadeUp 1.2s 1.5s forwards;
+    }
+    .scroll-indicator span {
+      font-size: 0.6rem;
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      color: var(--gold);
+    }
+    .scroll-line {
+      width: 1px;
+      height: 50px;
+      background: linear-gradient(to bottom, var(--gold), transparent);
+      animation: pulse-line 2s infinite;
+    }
+
+    /* Videos section */
+    .videos-section {
+      background: var(--dark);
+      padding: 7rem 2rem;
+      position: relative;
+    }
+
+    .videos-section::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 80px;
+      background: linear-gradient(to bottom, transparent, var(--gold), transparent);
+      margin: 0 auto 5rem;
+    }
+
+    .section-label {
+      text-align: center;
+      font-size: 0.7rem;
+      letter-spacing: 0.5em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 1rem;
+    }
+
+    .section-title {
+      text-align: center;
+      font-family: 'Cinzel Decorative', serif;
+      font-size: clamp(1.2rem, 3vw, 2rem);
+      color: var(--gold-light);
+      margin-bottom: 5rem;
+      font-weight: 400;
+    }
+
+    .videos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr));
+      gap: 3rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .video-card {
+      position: relative;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+    .video-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .video-card:nth-child(2) { transition-delay: 0.2s; }
+
+    .video-border {
+      position: absolute;
+      inset: -1px;
+      border: 1px solid rgba(201,168,76,0.3);
+      pointer-events: none;
+      transition: border-color 0.4s;
+    }
+    .video-card:hover .video-border {
+      border-color: rgba(201,168,76,0.8);
+      box-shadow: 0 0 30px rgba(201,168,76,0.1);
+    }
+
+    .video-corner {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-color: var(--gold);
+      border-style: solid;
+      transition: width 0.4s, height 0.4s;
+    }
+    .video-card:hover .video-corner { width: 20px; height: 20px; }
+    .video-corner.tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+    .video-corner.tr { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
+    .video-corner.bl { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
+    .video-corner.br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+
+    .video-wrapper {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+      background: #0a0a0a;
+    }
+    .video-wrapper iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+
+    /* Footer */
+    footer {
+      padding: 3rem 2rem;
+      text-align: center;
+      border-top: 1px solid rgba(201,168,76,0.1);
+    }
+    footer p {
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      color: rgba(201,168,76,0.3);
+      text-transform: uppercase;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(25px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse-line {
+      0%, 100% { opacity: 0.3; transform: scaleY(1); }
+      50%       { opacity: 1; transform: scaleY(1.2); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-trail" id="cursorTrail"></div>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="parallax-bg" id="parallaxBg"></div>
+    <canvas id="pixelCanvas"></canvas>
+    <div class="hero-content">
+      <h1 class="hero-title">AI Art</h1>
+    </div>
+    <div class="scroll-indicator">
+      <span>Explore</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- Videos -->
+  <section class="videos-section">
+    <p class="section-label">Featured Works</p>
+    <h2 class="section-title">The Collection</h2>
+    <div class="videos-grid">
+
+      <div class="video-card" data-observe>
+        <div class="video-border"></div>
+        <div class="video-corner tl"></div>
+        <div class="video-corner tr"></div>
+        <div class="video-corner bl"></div>
+        <div class="video-corner br"></div>
+        <div class="video-wrapper">
+          <iframe src="https://www.youtube.com/embed/yeDZMkkOK-w?rel=0&color=white"
+            title="AI Art Video 1"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </div>
+
+      <div class="video-card" data-observe>
+        <div class="video-border"></div>
+        <div class="video-corner tl"></div>
+        <div class="video-corner tr"></div>
+        <div class="video-corner bl"></div>
+        <div class="video-corner br"></div>
+        <div class="video-wrapper">
+          <iframe src="https://www.youtube.com/embed/CD0EiOAq9sI?rel=0&color=white"
+            title="AI Art Video 2"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen>
+          </iframe>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer></footer>
+
+  <script>
+    // ── Cursor setup ──────────────────────────────────────────────
+    const cursor = document.getElementById('cursor');
+    const trail  = document.getElementById('cursorTrail');
+
+    let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
+    let cursorX = mouseX, cursorY = mouseY;
+
+    document.addEventListener('mousemove', e => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    // Magnetic targets: video cards + title
+    const magnetTargets = () => [
+      ...document.querySelectorAll('.video-card'),
+      document.querySelector('.hero-title'),
+      document.querySelector('.scroll-indicator')
+    ].filter(Boolean);
+
+    const MAGNET_RADIUS = 120;
+    const MAGNET_STRENGTH = 0.35;
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    function animateCursor() {
+      cursorX = lerp(cursorX, mouseX, 0.18);
+      cursorY = lerp(cursorY, mouseY, 0.18);
+
+      // Check magnetic pull
+      let pulled = false;
+      let drawX = cursorX, drawY = cursorY;
+
+      for (const el of magnetTargets()) {
+        const rect = el.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top  + rect.height / 2;
+        const dx = mouseX - cx;
+        const dy = mouseY - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < MAGNET_RADIUS) {
+          const pull = (1 - dist / MAGNET_RADIUS) * MAGNET_STRENGTH;
+          drawX = lerp(cursorX, cx + dx * (1 - pull), 0.6);
+          drawY = lerp(cursorY, cy + dy * (1 - pull), 0.6);
+          pulled = true;
+
+          // Subtle element push
+          const pushX = dx * pull * 0.12;
+          const pushY = dy * pull * 0.12;
+          el.style.transform = `translate(${pushX}px, ${pushY}px)`;
+        } else {
+          el.style.transform = '';
+        }
+      }
+
+      cursor.style.left = drawX + 'px';
+      cursor.style.top  = drawY + 'px';
+      trail.style.left  = cursorX + 'px';
+      trail.style.top   = cursorY + 'px';
+
+      cursor.classList.toggle('pulled', pulled);
+      trail.classList.toggle('pulled', pulled);
+
+      requestAnimationFrame(animateCursor);
+    }
+    animateCursor();
+
+    // ── Parallax ──────────────────────────────────────────────────
+    const bg = document.getElementById('parallaxBg');
+    window.addEventListener('scroll', () => {
+      bg.style.transform = `translateY(${window.scrollY * 0.4}px) scale(1.15)`;
+    }, { passive: true });
+
+    // ── Pixel shatter on hero click ───────────────────────────────
+    const hero   = document.querySelector('.hero');
+    const canvas = document.getElementById('pixelCanvas');
+    const ctx    = canvas.getContext('2d');
+
+    const IMG_URL = 'https://raw.githubusercontent.com/whoisthemetro/AI/main/Suzanne%20trapped%20in%20a%20cage_1920x1080.png';
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = IMG_URL;
+
+    // Track live pixel "craters" — array of {x,y,r, born}
+    const craters = [];
+    const PIXEL_SIZE = 14;        // pixel block size in shatter zone
+    const CRATER_RADIUS = 90;     // radius of each shatter zone
+    const CRATER_LIFE = 2200;     // ms before fading out
+    let imgLoaded = false;
+
+    img.onload = () => { imgLoaded = true; };
+
+    function resizeCanvas() {
+      canvas.width  = hero.offsetWidth;
+      canvas.height = hero.offsetHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function drawPixelZones() {
+      if (!imgLoaded || craters.length === 0) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const now = Date.now();
+
+      // Offscreen img-to-canvas scale
+      const scaleX = img.naturalWidth  / canvas.width;
+      const scaleY = img.naturalHeight / canvas.height;
+
+      craters.forEach((c, i) => {
+        const age    = now - c.born;
+        const prog   = age / CRATER_LIFE;           // 0→1
+        const radius = c.r * (1 + prog * 0.6);      // expands slightly
+        const alpha  = Math.max(0, 1 - prog * prog); // fades out
+
+        if (alpha <= 0) { craters.splice(i, 1); return; }
+
+        ctx.save();
+        ctx.globalAlpha = alpha * 0.92;
+
+        // Draw pixelated image in the crater zone
+        const startX = Math.floor((c.x - radius) / PIXEL_SIZE) * PIXEL_SIZE;
+        const startY = Math.floor((c.y - radius) / PIXEL_SIZE) * PIXEL_SIZE;
+
+        for (let px = startX; px < c.x + radius; px += PIXEL_SIZE) {
+          for (let py = startY; py < c.y + radius; py += PIXEL_SIZE) {
+            const dx = (px + PIXEL_SIZE / 2) - c.x;
+            const dy = (py + PIXEL_SIZE / 2) - c.y;
+            if (dx * dx + dy * dy > radius * radius) continue;
+
+            // Sample colour from img
+            const srcX = Math.min(Math.floor((px + PIXEL_SIZE / 2) * scaleX), img.naturalWidth - 1);
+            const srcY = Math.min(Math.floor((py + PIXEL_SIZE / 2) * scaleY), img.naturalHeight - 1);
+
+            // Draw a tiny offscreen canvas to read pixel colour
+            ctx.drawImage(img,
+              srcX, srcY, 1, 1,
+              px, py, PIXEL_SIZE, PIXEL_SIZE
+            );
+          }
+        }
+        ctx.restore();
+      });
+
+      requestAnimationFrame(drawPixelZones);
+    }
+
+    hero.addEventListener('click', e => {
+      // Only fire in hero area
+      const rect = hero.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      craters.push({ x, y, r: CRATER_RADIUS, born: Date.now() });
+      if (craters.length === 1) drawPixelZones(); // start loop
+
+      // Launch shards
+      const count = 22;
+      for (let i = 0; i < count; i++) {
+        const angle   = (Math.PI * 2 / count) * i + Math.random() * 0.4;
+        const speed   = 4 + Math.random() * 7;
+        const size    = PIXEL_SIZE * (0.5 + Math.random() * 1.4);
+        const shard   = document.createElement('div');
+        shard.className = 'shard';
+
+        // Random gold/white pixel colour
+        const hue = Math.random() > 0.5 ? `rgba(201,168,76,${0.6 + Math.random()*0.4})`
+                                         : `rgba(240,220,160,${0.5 + Math.random()*0.4})`;
+        shard.style.cssText = `
+          left:${e.clientX}px; top:${e.clientY}px;
+          width:${size}px; height:${size}px;
+          background:${hue};
+          transform: translate(-50%,-50%);
+        `;
+        document.body.appendChild(shard);
+
+        let vx = Math.cos(angle) * speed;
+        let vy = Math.sin(angle) * speed;
+        let ox = 0, oy = 0, rot = 0, life = 1;
+        const gravity = 0.25 + Math.random() * 0.2;
+        const rotSpeed = (Math.random() - 0.5) * 12;
+
+        function animShard() {
+          vy += gravity;
+          ox += vx; oy += vy; rot += rotSpeed; life -= 0.022;
+          if (life <= 0) { shard.remove(); return; }
+          shard.style.transform = `translate(calc(-50% + ${ox}px), calc(-50% + ${oy}px)) rotate(${rot}deg)`;
+          shard.style.opacity = life;
+          requestAnimationFrame(animShard);
+        }
+        requestAnimationFrame(animShard);
+      }
+
+      // Cursor burst flash
+      cursor.style.width  = '50px';
+      cursor.style.height = '50px';
+      cursor.style.background = '#fff';
+      setTimeout(() => {
+        cursor.style.width  = '';
+        cursor.style.height = '';
+        cursor.style.background = '';
+      }, 150);
+    });
+
+    // ── Scroll reveal ─────────────────────────────────────────────
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+      });
+    }, { threshold: 0.15 });
+    document.querySelectorAll('[data-observe]').forEach(el => observer.observe(el));
+  </script>
+</body>
+</html>
